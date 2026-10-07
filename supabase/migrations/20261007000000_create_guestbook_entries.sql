@@ -24,3 +24,8 @@ create policy "anyone can add entries without ai fields"
 
 -- 브라우저(anon)는 읽기/쓰기만. UPDATE/DELETE는 주지 않는다.
 grant select, insert on public.guestbook_entries to anon, authenticated;
+
+-- 2단계: Edge Function(service_role)이 글을 읽고 AI 답글을 저장한다.
+grant select, update on public.guestbook_entries to service_role;
+-- 기본으로 붙는 불필요한 권한 회수
+revoke truncate, trigger, references on public.guestbook_entries from anon, authenticated;
