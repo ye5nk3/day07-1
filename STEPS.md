@@ -37,7 +37,7 @@ PRD.md의 3단계를 그대로 따른다. 각 단계는 끝에 확인 항목을 
    - 함수를 먼저 배포해 `nvidia/nemotron-3-ultra-550b-a55b:free`가 실제로 답글 문장을 돌려주는지 확인
    - 판정문만 오거나 모델이 없거나(404)·채팅용이 아니면(400) **여기서 멈추고 사용자에게 알린다**
 2. **Edge Function `ai-reply` 작성**
-   - 맨 위 상수 `MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"`
+   - 맨 위 상수 `MODELS = [기본 "nvidia/nemotron-3-ultra-550b-a55b:free", 예비 "google/gemma-4-31b-it:free"]` (앞에서부터 시도, 실패하면 다음 모델)
    - 입력 `{ id }` 검증(uuid) → service role 클라이언트로 글 조회 → 이미 답글/오류 있으면 409
    - OpenRouter 호출: `Authorization: Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`, 시스템 프롬프트(한국어 1~2문장, 따뜻하게, 300자 이내), 사용자 메시지 = `이름: …\n글: …`, `max_tokens` 1000, `AbortSignal.timeout(20000)`
    - 성공 → `ai_reply` UPDATE, 실패 → 이유를 `ai_error`에 UPDATE (키·스택 제외)
@@ -62,6 +62,12 @@ PRD.md의 3단계를 그대로 따른다. 각 단계는 끝에 확인 항목을 
    - [ ] 응답이 느려도 대기 문구가 보였다가 답글로 바뀜
    - [ ] 모바일 폭(375px)에서 가로 스크롤 없음, 다크 모드 가독성 OK
    - [ ] 1·2단계 확인 항목 재통과 (회귀 점검)
+
+## 추가 — AI 모델 선택
+- [x] `ai_model` 컬럼 추가, INSERT 정책에 `ai_model is null` 조건
+- [x] 함수: 요청의 `model`을 허용 목록으로 검사(밖이면 400), 고른 모델 우선 + 예비 1개, 쓴 모델을 `ai_model`에 저장
+- [x] 화면: 상단 모델 드롭다운(선택 기억), 요청에 `model` 포함, 말풍선에 모델명 표시
+- 확인: 허용 목록 밖 모델은 400. 무료 모델이 한도/과부하일 때는 예비 모델로 넘어가거나 실패 이유가 표시된다.
 
 ## 마무리
 - [ ] 브라우저에서 처음부터 끝까지 한 번 실행해 보기 (글 작성 → 대기 → 답글 → 새로고침)

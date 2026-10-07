@@ -10,7 +10,7 @@
 | 라이브러리 | `@supabase/supabase-js` v2를 CDN `<script>`로 로드 (jsdelivr) |
 | DB | Supabase Postgres, 새 표 `guestbook_entries` |
 | AI 호출 | Supabase Edge Function `ai-reply` (Deno), **`verify_jwt = false`** |
-| AI 모델 | OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free` |
+| AI 모델 | OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free`, 실패 시 예비로 `google/gemma-4-31b-it:free` |
 | 비밀 키 | `OPENROUTER_API_KEY` — 이미 Supabase Secrets에 있음. 코드·저장소·HTML 어디에도 쓰지 않는다 |
 
 브라우저에 들어가는 값은 Supabase 프로젝트 URL과 **publishable(anon) 키**뿐이다. 이 키는 공개돼도 되도록 설계된 키이고, 권한은 RLS로 제한한다.
@@ -26,7 +26,10 @@
 - 답글 생성은 `ai_reply`와 `ai_error`가 둘 다 비어 있는 글에만 1회 허용한다 (중복 호출로 비용 낭비 방지).
 - AI 답글은 한국어, 1~2문장, 따뜻하고 짧게, 최대 300자. 시스템 프롬프트로 지시한다.
 - OpenRouter 호출 제한 시간 20초, `max_tokens` 1000 (추론 모델이 생각에 토큰을 쓰기 때문, 답글은 300자로 자름).
-- 모델 ID는 Edge Function 맨 위의 상수 한 곳에만 둔다.
+- 화면 맨 위에 **AI 모델 선택**(드롭다운)을 둔다. 선택은 브라우저에 기억한다(localStorage). 선택지는 4개: Nemotron 3 Ultra(기본), Gemma 4 31B, Gemma 4 26B, Nemotron 3 Nano Omni.
+- 함수는 **허용 목록에 있는 모델만** 받는다(목록 밖이면 400). 고른 모델이 실패하면 예비 1개까지만 시도한다(모델당 15초, 최대 2회).
+- 실제로 답글을 쓴 모델을 새 컬럼 `ai_model`에 저장하고, 답글 말풍선 아래에 표시한다.
+- 모델 목록은 함수의 `MODELS`와 화면의 `MODELS`, 두 곳을 같이 고친다.
 
 ## 4. 데이터 모델
 표 `public.guestbook_entries`
@@ -38,6 +41,7 @@
 | `message` | text, NOT NULL, CHECK 길이 1~200 | 한 줄 글 |
 | `ai_reply` | text, NULL | AI 답글 (2단계~) |
 | `ai_error` | text, NULL | AI 실패 이유 (2단계~) |
+| `ai_model` | text, NULL | 답글을 실제로 쓴 모델 (함수만 기록) |
 | `created_at` | timestamptz, NOT NULL, default `now()` | 정렬 기준, 인덱스 `created_at desc` |
 
 RLS 켬. 정책: `anon`·`authenticated`에 SELECT 허용, INSERT 허용(`ai_reply`, `ai_error`는 NULL일 때만). UPDATE/DELETE 정책 없음.

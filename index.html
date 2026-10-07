@@ -26,6 +26,15 @@
   h1 { margin: 0 0 .25rem; font-size: 1.6rem; }
   .sub { margin: 0 0 1.25rem; color: var(--muted); font-size: .95rem; }
 
+  .model-picker { display: flex; align-items: center; gap: .6rem; margin: 0 0 1rem; }
+  .model-picker label { font-size: .9rem; color: var(--muted); white-space: nowrap; }
+  select {
+    flex: 1; min-width: 0; font: inherit; color: inherit; padding: .5rem .6rem;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  }
+  select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .model-tag { display: block; margin-top: .3rem; font-size: .75rem; color: var(--muted); font-style: normal; }
+
   form, li { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1rem; }
   form { display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1.5rem; }
   input, button { font: inherit; color: inherit; }
@@ -68,6 +77,11 @@
   <h1>방명록</h1>
   <p class="sub">한 줄을 남기면 AI가 답글을 달아 드려요.</p>
 
+  <div class="model-picker">
+    <label for="model">AI 모델</label>
+    <select id="model"></select>
+  </div>
+
   <form id="form">
     <input id="name" placeholder="이름" maxlength="20" autocomplete="off" aria-label="이름">
     <div class="msg-row">
@@ -89,8 +103,27 @@
   const WAIT_LIMIT_MS = 60_000; // 이 시간이 지나도 답글이 없으면 "답글이 없습니다"
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  // 함수(supabase/functions/ai-reply)의 허용 목록과 같아야 한다.
+  const MODELS = [
+    { id: "nvidia/nemotron-3-ultra-550b-a55b:free", label: "Nemotron 3 Ultra (기본)" },
+    { id: "google/gemma-4-31b-it:free", label: "Gemma 4 31B" },
+    { id: "google/gemma-4-26b-a4b-it:free", label: "Gemma 4 26B" },
+    { id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", label: "Nemotron 3 Nano Omni" },
+  ];
+  const modelLabel = (id) => MODELS.find((m) => m.id === id)?.label ?? id;
+
   const $ = (id) => document.getElementById(id);
   const nameEl = $("name"), msgEl = $("message"), errEl = $("error");
+
+  const modelEl = $("model");
+  for (const m of MODELS) modelEl.append(new Option(m.label, m.id));
+  try {
+    const saved = localStorage.getItem("guestbook-model");
+    if (MODELS.some((m) => m.id === saved)) modelEl.value = saved;
+  } catch (_) { /* 저장소를 못 써도 괜찮다 */ }
+  modelEl.addEventListener("change", () => {
+    try { localStorage.setItem("guestbook-model", modelEl.value); } catch (_) {}
+  });
 
   let entries = [];
   const pending = new Set(); // 이 화면에서 함수 응답을 기다리는 글 id
@@ -135,7 +168,14 @@
       li.append(meta, p);
 
       if (e.ai_reply) {
-        li.append(bubble("", "🤖 " + e.ai_reply));
+        const b = bubble("", "🤖 " + e.ai_reply);
+        if (e.ai_model) {
+          const tag = document.createElement("em");
+          tag.className = "model-tag";
+          tag.textContent = modelLabel(e.ai_model);
+          b.append(tag);
+        }
+        li.append(b);
       } else if (e.ai_error) {
         li.append(bubble("failed", "AI 답글을 못 받았어요: " + e.ai_error));
       } else if (isWaiting(e)) {
@@ -160,13 +200,13 @@
     render();
   }
 
-  async function requestReply(id) {
+  async function requestReply(id, model) {
     pending.add(id);
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, model }),
         signal: AbortSignal.timeout(40_000),
       });
       if (res.status >= 500) throw new Error("함수 오류 " + res.status);
@@ -198,7 +238,7 @@
     msgEl.focus();
     pending.add(saved.id);           // 목록에 먼저 "AI가 쓰는 중…"으로 나타나게 한다
     await load();
-    requestReply(saved.id);          // 기다리지 않음: 그동안 다른 글도 쓸 수 있다
+    requestReply(saved.id, modelEl.value); // 기다리지 않음: 그동안 다른 글도 쓸 수 있다
   });
 
   // 시각 갱신, 그리고 다른 곳에서 처리 중인 글(새로고침 등)의 답글을 가져오기

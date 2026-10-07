@@ -29,3 +29,12 @@ grant select, insert on public.guestbook_entries to anon, authenticated;
 grant select, update on public.guestbook_entries to service_role;
 -- 기본으로 붙는 불필요한 권한 회수
 revoke truncate, trigger, references on public.guestbook_entries from anon, authenticated;
+
+-- 답글을 실제로 쓴 모델 (Edge Function만 기록한다)
+alter table public.guestbook_entries add column ai_model text;
+
+drop policy "anyone can add entries without ai fields" on public.guestbook_entries;
+create policy "anyone can add entries without ai fields"
+  on public.guestbook_entries for insert
+  to anon, authenticated
+  with check (ai_reply is null and ai_error is null and ai_model is null);
