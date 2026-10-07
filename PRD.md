@@ -10,7 +10,7 @@
 | 라이브러리 | `@supabase/supabase-js` v2를 CDN `<script>`로 로드 (jsdelivr) |
 | DB | Supabase Postgres, 새 표 `guestbook_entries` |
 | AI 호출 | Supabase Edge Function `ai-reply` (Deno), **`verify_jwt = false`** |
-| AI 모델 | OpenRouter `nvidia/nemotron-3.5-content-safety:free` |
+| AI 모델 | OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free` |
 | 비밀 키 | `OPENROUTER_API_KEY` — 이미 Supabase Secrets에 있음. 코드·저장소·HTML 어디에도 쓰지 않는다 |
 
 브라우저에 들어가는 값은 Supabase 프로젝트 URL과 **publishable(anon) 키**뿐이다. 이 키는 공개돼도 되도록 설계된 키이고, 권한은 RLS로 제한한다.
@@ -25,7 +25,7 @@
 - 글 내용은 클라이언트가 함수로 보내지 않고, 함수가 **글 id로 DB에서 읽어** 온다 (조작 방지).
 - 답글 생성은 `ai_reply`와 `ai_error`가 둘 다 비어 있는 글에만 1회 허용한다 (중복 호출로 비용 낭비 방지).
 - AI 답글은 한국어, 1~2문장, 따뜻하고 짧게, 최대 300자. 시스템 프롬프트로 지시한다.
-- OpenRouter 호출 제한 시간 20초, `max_tokens` 200.
+- OpenRouter 호출 제한 시간 20초, `max_tokens` 1000 (추론 모델이 생각에 토큰을 쓰기 때문, 답글은 300자로 자름).
 - 모델 ID는 Edge Function 맨 위의 상수 한 곳에만 둔다.
 
 ## 4. 데이터 모델
@@ -82,7 +82,7 @@ RLS 켬. 정책: `anon`·`authenticated`에 SELECT 허용, INSERT 허용(`ai_rep
 ## 7. 위험과 대응
 | 위험 | 대응 |
 |---|---|
-| **지정 모델은 콘텐츠 안전 분류용(content-safety)이라, 일반 대화 답글 대신 `safe`/`unsafe` 같은 판정문만 돌려줄 수 있다.** 모델 존재 여부와 `:free` 제공 여부도 확인 필요 | 2단계 첫 작업으로 curl 실호출로 확인한다. 답글 형태가 나오지 않으면 사용자에게 알리고 모델 상수만 교체(예: 다른 `:free` 대화 모델)하도록 한다. 임의로 바꾸지는 않는다 |
+| 무료 모델이라 간헐적으로 빈 응답이나 한도 초과(429)가 난다. 임베딩·안전 분류 모델은 채팅 답글에 쓸 수 없다(400) | 실패해도 글은 저장하고 이유를 화면에 보여 준다. 모델 ID는 함수 맨 위 상수 한 곳만 바꾸면 된다. 모델을 고를 때는 대화용(`instruct`/`it`/`chat`)인지 확인한다 |
 | verify_jwt 꺼짐 → 누구나 함수 호출 가능 | 글 id 필수, 글당 1회, 길이 제한, service role은 함수 안에서만 사용 |
 | 무료 모델 한도(429) | 실패 이유로 표시, 글은 보존 |
 | 스팸 글 | 이번 범위 밖. 이후 과제로 기록 |

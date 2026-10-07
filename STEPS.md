@@ -34,12 +34,12 @@ PRD.md의 3단계를 그대로 따른다. 각 단계는 끝에 확인 항목을 
 
 ## 2단계 — AI 답글
 1. **모델 사전 확인** (키는 터미널에 노출하지 않고 함수 안에서만 사용)
-   - 임시 테스트용으로 함수를 먼저 배포해 `nvidia/nemotron-3.5-content-safety:free`가 실제로 답글 문장을 돌려주는지 확인
-   - 판정문만 오거나 모델이 없으면 **여기서 멈추고 사용자에게 알린다**
+   - 함수를 먼저 배포해 `nvidia/nemotron-3-ultra-550b-a55b:free`가 실제로 답글 문장을 돌려주는지 확인
+   - 판정문만 오거나 모델이 없거나(404)·채팅용이 아니면(400) **여기서 멈추고 사용자에게 알린다**
 2. **Edge Function `ai-reply` 작성**
-   - 맨 위 상수 `MODEL = "nvidia/nemotron-3.5-content-safety:free"`
+   - 맨 위 상수 `MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"`
    - 입력 `{ id }` 검증(uuid) → service role 클라이언트로 글 조회 → 이미 답글/오류 있으면 409
-   - OpenRouter 호출: `Authorization: Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`, 시스템 프롬프트(한국어 1~2문장, 따뜻하게, 300자 이내), 사용자 메시지 = `이름: …\n글: …`, `max_tokens` 200, `AbortSignal.timeout(20000)`
+   - OpenRouter 호출: `Authorization: Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`, 시스템 프롬프트(한국어 1~2문장, 따뜻하게, 300자 이내), 사용자 메시지 = `이름: …\n글: …`, `max_tokens` 1000, `AbortSignal.timeout(20000)`
    - 성공 → `ai_reply` UPDATE, 실패 → 이유를 `ai_error`에 UPDATE (키·스택 제외)
    - 응답 JSON + CORS 헤더(`OPTIONS` 처리 포함)
 3. **배포**: `verify_jwt: false`로 배포 (`config.toml`에도 기록)
