@@ -1,0 +1,9 @@
+앞서 만든 OpenRouter API 키를 이용해서, 글을 남기면 AI가 답글을 달아 주는 방명록 웹앱을 만들고 싶어. 다음과 같이 3단계로 나누어서 PRD를 만들어 줘.
+1단계는 이름과 한 줄 글(200자까지)을 입력받아 Supabase의 새 표에 저장하고, 새 글부터 보여 줘.
+2단계는 남긴 글과 [openrouter/free] 모델을 사용해서 AI 답글을 생성하고 함께 저장해. AI가 실패하면 글만 저장하고 이유를 보여 줘.
+3단계는 기다리는 동안 “AI가 쓰는 중…”을 보여 주고, 화면을 보기 좋게 다듬어 줘.
+지켜 줄 것:
+- OpenRouter 키는 내 Supabase 프로젝트의 Secrets에 OPENROUTER_API_KEY로 넣어 뒀어. 코드에는 넣지 마.
+- AI는 Supabase Edge Function이 호출하고, 함수의 verify_jwt는 꺼 줘.
+- index.html 하나로 npm 없이 만들어 줘. 정하지 않은 건 네가 정해서 적어 줘.
+PRD.md와 STEPS.md로 저장해 줘.

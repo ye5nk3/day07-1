@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>방명록</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 560px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+  h1 { margin-bottom: 1rem; }
+  form { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1.5rem; }
+  input, button { font: inherit; padding: .5rem; }
+  .row { display: flex; gap: .5rem; align-items: center; }
+  .row input { flex: 1; }
+  .count { font-size: .85rem; color: #666; }
+  .error { color: #c0392b; min-height: 1.4em; margin: 0; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { border-bottom: 1px solid #ddd; padding: .75rem 0; }
+  .meta { font-size: .85rem; color: #666; }
+  .msg { margin: .25rem 0 0; word-break: break-word; }
+</style>
+</head>
+<body>
+<h1>방명록</h1>
+
+<form id="form">
+  <input id="name" placeholder="이름" maxlength="20" autocomplete="off">
+  <div class="row">
+    <input id="message" placeholder="한 줄 글 (200자까지)" maxlength="200" autocomplete="off">
+    <span class="count" id="count">0/200</span>
+  </div>
+  <button id="submit" type="submit">남기기</button>
+  <p class="error" id="error" role="alert"></p>
+</form>
+
+<ul id="list"></ul>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://bkebbwsfwcnrrhbkrtyt.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_7gPnaBYMNoPONKPkaYI6tw_9CwgTQDd"; // 공개용 키
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const $ = (id) => document.getElementById(id);
+  const nameEl = $("name"), msgEl = $("message"), errEl = $("error");
+
+  function render(entries) {
+    const list = $("list");
+    list.replaceChildren(...entries.map((e) => {
+      const li = document.createElement("li");
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = `${e.name} · ${new Date(e.created_at).toLocaleString("ko-KR")}`;
+      const p = document.createElement("p");
+      p.className = "msg";
+      p.textContent = e.message;
+      li.append(meta, p);
+      return li;
+    }));
+  }
+
+  async function load() {
+    const { data, error } = await db.from("guestbook_entries")
+      .select("*").order("created_at", { ascending: false }).limit(50);
+    if (error) { errEl.textContent = "목록을 불러오지 못했어요: " + error.message; return; }
+    render(data);
+  }
+
+  msgEl.addEventListener("input", () => { $("count").textContent = `${msgEl.value.length}/200`; });
+
+  $("form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    errEl.textContent = "";
+    const name = nameEl.value.trim(), message = msgEl.value.trim();
+    if (!name || name.length > 20) { errEl.textContent = "이름은 1~20자로 적어 주세요."; return; }
+    if (!message || message.length > 200) { errEl.textContent = "글은 1~200자로 적어 주세요."; return; }
+
+    $("submit").disabled = true;
+    const { error } = await db.from("guestbook_entries").insert({ name, message });
+    $("submit").disabled = false;
+    if (error) { errEl.textContent = "저장하지 못했어요: " + error.message; return; }
+
+    msgEl.value = "";
+    $("count").textContent = "0/200";
+    load();
+  });
+
+  load();
+</script>
+</body>
+</html>
